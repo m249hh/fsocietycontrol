@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Variable Control</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #0d0d0d;
+    --surface: #161616;
+    --border:  #2a2a2a;
+    --accent:  #00e5a0;
+    --muted:   #555;
+    --text:    #e8e8e8;
+    --error:   #ff4d4d;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 540px;
+  }
+
+  h1 {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 2rem;
+  }
+
+  .field {
+    margin-bottom: 1.5rem;
+  }
+
+  label {
+    display: block;
+    font-size: 0.7rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+
+  .row {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  input[type="text"] {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.78rem;
+    padding: 0.6rem 0.75rem;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  input[type="text"]:focus {
+    border-color: var(--accent);
+  }
+
+  button {
+    background: transparent;
+    border: 1px solid var(--accent);
+    border-radius: 4px;
+    color: var(--accent);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    padding: 0 1rem;
+    text-transform: uppercase;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+  }
+
+  button:hover  { background: var(--accent); color: #000; }
+  button:active { opacity: 0.8; }
+
+  .status {
+    font-size: 0.7rem;
+    margin-top: 0.4rem;
+    min-height: 1rem;
+    letter-spacing: 0.05em;
+  }
+  .status.ok  { color: var(--accent); }
+  .status.err { color: var(--error);  }
+
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 1.75rem 0;
+  }
+
+  .conn-row {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.75rem;
+  }
+
+  .dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    flex-shrink: 0;
+    transition: background 0.3s;
+  }
+  .dot.ok  { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+  .dot.err { background: var(--error);  }
+
+  .conn-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Variable Control</h1>
+
+  <!-- Connection status -->
+  <div class="conn-row">
+    <div class="dot" id="dot"></div>
+    <span class="conn-label" id="connLabel">Checking app…</span>
+  </div>
+
+  <!-- Var 1 -->
+  <div class="field">
+    <label>var1</label>
+    <div class="row">
+      <input type="text" id="var1Input"
+             placeholder="46534F43494554…"
+             spellcheck="false" autocomplete="off" />
+      <button onclick="sendVar('var1')">Send</button>
+    </div>
+    <div class="status" id="var1Status"></div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- Var 2 -->
+  <div class="field">
+    <label>var2</label>
+    <div class="row">
+      <input type="text" id="var2Input"
+             placeholder="45434F5250454…"
+             spellcheck="false" autocomplete="off" />
+      <button onclick="sendVar('var2')">Send</button>
+    </div>
+    <div class="status" id="var2Status"></div>
+  </div>
+</div>
+
+<script>
+  const BASE = "http://127.0.0.1:8079";
+
+  // ── Check connection & load current values ──────────────────
+  async function checkConnection() {
+    const dot   = document.getElementById("dot");
+    const label = document.getElementById("connLabel");
+    try {
+      const res  = await fetch(`${BASE}/values`, { signal: AbortSignal.timeout(2000) });
+      const data = await res.json();
+      dot.className   = "dot ok";
+      label.textContent = "App connected";
+      // Populate inputs with current values
+      document.getElementById("var1Input").value = data.var1 ?? "";
+      document.getElementById("var2Input").value = data.var2 ?? "";
+    } catch {
+      dot.className   = "dot err";
+      label.textContent = "App not running";
+    }
+  }
+
+  // ── Send a variable update ──────────────────────────────────
+  async function sendVar(varName) {
+    const input  = document.getElementById(`${varName}Input`);
+    const status = document.getElementById(`${varName}Status`);
+    const value  = input.value.trim();
+
+    if (!value) {
+      status.className   = "status err";
+      status.textContent = "Value is empty.";
+      return;
+    }
+
+    status.className   = "status";
+    status.textContent = "Sending…";
+
+    try {
+      const body = new URLSearchParams({ var: varName, value });
+      const res  = await fetch(`${BASE}/set`, {
+        method: "POST",
+        body,
+        signal: AbortSignal.timeout(3000)
+      });
+      const data = await res.json();
+      if (data.ok) {
+        status.className   = "status ok";
+        status.textContent = "✓ Updated";
+      } else {
+        throw new Error(data.error ?? "Unknown error");
+      }
+    } catch (e) {
+      status.className   = "status err";
+      status.textContent = e.message === "Failed to fetch"
+        ? "App not reachable."
+        : `Error: ${e.message}`;
+    }
+  }
+
+  // Allow Enter key to submit
+  ["var1Input","var2Input"].forEach(id => {
+    const varName = id.replace("Input","");
+    document.getElementById(id)
+      .addEventListener("keydown", e => { if (e.key === "Enter") sendVar(varName); });
+  });
+
+  checkConnection();
+  setInterval(checkConnection, 5000); // re-check every 5s
+</script>
+</body>
+</html>
